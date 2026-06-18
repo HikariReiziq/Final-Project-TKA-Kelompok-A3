@@ -1,0 +1,26 @@
+db-mongo
+public ip: 68.183.185.9
+private ip: 10.104.0.2
+
+ssh root@68.183.185.9
+
+
+worker-1
+public ip: 168.144.45.189
+private ip: 10.104.0.3
+
+ssh root@168.144.45.189
+
+
+worker-2
+public ip: 168.144.136.155
+private ip: 10.104.0.4
+
+ssh root@168.144.136.155
+
+
+worker-3
+public ip: 152.42.191.158
+private ip: 10.104.0.5
+
+ssh root@152.42.191.158
