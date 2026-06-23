@@ -28,12 +28,14 @@ import bcrypt
 import jwt
 from bson import ObjectId
 from flask import Flask, jsonify, request, g
+from flask_cors import CORS
 from pymongo import MongoClient, DESCENDING, ASCENDING
 
 # ═══════════════════════════════════════════
 # Config
 # ═══════════════════════════════════════════
 app = Flask(__name__)
+CORS(app)
 
 MONGO_URI   = os.environ.get("MONGO_URI",   "mongodb://localhost:27017/")
 JWT_SECRET  = os.environ.get("JWT_SECRET",  "ganti-ini-di-production-dengan-string-acak-panjang")

@@ -63,6 +63,8 @@ label {
 
 input[type="text"],
 input[type="number"],
+input[type="email"],
+input[type="password"],
 select {
   width: 100%;
   padding: 10px 14px;
@@ -126,4 +128,25 @@ button:active {
   background: #fff5f5;
   border: 1px solid #feb2b2;
   color: #c53030;
+}
+
+.auth-forms {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.auth-form {
+  flex: 1;
+  min-width: 280px;
+  background: #f7fafc;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.auth-form h3 {
+  margin-bottom: 12px;
+  font-size: 1.05rem;
+  color: #2d3748;
 }
