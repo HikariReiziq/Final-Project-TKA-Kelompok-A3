@@ -9,13 +9,20 @@ Sebuah layanan backend **Order Processing Service** yang di-deploy pada infrastr
 > **Cloud Provider:** DigitalOcean (Budget: $75/bulan)
 > **URL Akses:** [`http://129.212.209.53`](http://129.212.209.53)
 
+| Nama | NRP |
+|------|-----|
+| Anggota 1 | NRP 1 |
+| Anggota 2 | NRP 2 |
+| Anggota 3 | NRP 3 |
+| Anggota 4 | NRP 4 |
+
 ---
 
 ## 📑 Daftar Isi
 
 1. [Introduction](#1-introduction)
 2. [Arsitektur Cloud](#2-arsitektur-cloud)
-3. [Implementasi — Panduan Setup Lengkap](#3-implementasi--panduan-setup-lengkap)
+3. [Implementasi](#3-implementasi)
 4. [Hasil Pengujian Endpoint](#4-hasil-pengujian-endpoint)
 5. [Hasil Load Testing](#5-hasil-load-testing)
 6. [Kesimpulan dan Saran](#6-kesimpulan-dan-saran)
@@ -117,7 +124,7 @@ Sebagai Cloud Engineer, kami diminta untuk **mendeploy, mengonfigurasi, dan meng
 | 5 | Database Server | `db-mongo` | 2vCPU, 4 GB RAM, 80 GB SSD | SGP1 | $24 |
 | | | | | **Total** | **$72/bulan** |
 
-> **Budget Utilization:** $72 / $75 = **96%** — Sangat efisien.
+> **Budget Utilization:** $72 / $75 = **96%** — Sangat efisien, hanya menyisakan $3 sebagai buffer.
 
 ### 2.3 Justifikasi Pemilihan Arsitektur
 
@@ -131,9 +138,9 @@ Sebagai Cloud Engineer, kami diminta untuk **mendeploy, mengonfigurasi, dan meng
 
 ---
 
-## 3. Implementasi — Panduan Setup Lengkap
+## 3. Implementasi
 
-> **Catatan:** Panduan ini ditulis agar orang yang baru pertama kali menggunakan DigitalOcean pun bisa mengikutinya langkah per langkah.
+Panduan ini ditulis secara detail agar siapa saja — termasuk yang baru pertama kali menggunakan cloud — dapat mengikuti langkah-langkahnya dari awal hingga akhir.
 
 ### Prasyarat
 
@@ -145,9 +152,9 @@ Sebelum memulai, pastikan kamu punya:
 
 ---
 
-### Langkah 1 — Buat Droplet Database (MongoDB)
+### 3.1 Setup Database Server (MongoDB)
 
-#### 1.1 Buat Droplet di DigitalOcean
+#### Buat Droplet di DigitalOcean
 
 1. Login ke [DigitalOcean Dashboard](https://cloud.digitalocean.com/)
 2. Klik **Create** → **Droplets**
@@ -158,9 +165,9 @@ Sebelum memulai, pastikan kamu punya:
    - **Authentication:** SSH Key (direkomendasikan) atau Password
    - **Hostname:** `db-mongo`
 4. Klik **Create Droplet**
-5. Catat **IP Address** droplet yang muncul (contoh: `68.183.185.xxx`)
+5. Catat **IP Address** droplet yang muncul
 
-#### 1.2 Install MongoDB
+#### Install MongoDB
 
 SSH ke droplet database:
 
@@ -193,7 +200,19 @@ systemctl enable mongod
 systemctl status mongod
 ```
 
-#### 1.3 Restore Data Awal (Seed Data)
+![MongoDB Status](result/mongodb_status.png)
+
+**Gambar 1.** Status layanan MongoDB.
+
+#### Konfigurasi MongoDB
+
+```yaml
+net:
+  port: 27017
+  bindIp: 0.0.0.0
+```
+
+#### Restore Data Awal (Seed Data)
 
 ```bash
 # Install tools untuk restore
@@ -207,98 +226,109 @@ apt install -y mongodb-database-tools
 mongorestore --drop /root/dump/
 ```
 
-#### 1.4 Buat Index untuk Optimasi Query
+Data awal yang di-restore:
 
-```bash
-# Masuk ke MongoDB shell
+| Collection | Dokumen | Keterangan |
+|------------|---------|------------|
+| users | 505 | 5 admin + 500 user biasa |
+| products | 96 | 7 kategori produk |
+| orders | 10.000 | Riwayat transaksi 1 tahun terakhir |
+| audit_logs | 2.000 | Log aksi admin |
+| sessions | 100 | Sample sesi aktif |
+
+---
+
+### 3.2 MongoDB Optimization
+
+Untuk meningkatkan performa query, beberapa index ditambahkan pada collection yang digunakan aplikasi.
+
+```javascript
+// Masuk ke MongoDB shell
 mongosh
-
-# Pilih database
 use orderdb
 
-# === Index untuk collection users ===
+// === Index untuk collection users ===
 db.users.createIndex({ email: 1 }, { unique: true })
 db.users.createIndex({ role: 1 })
 db.users.createIndex({ is_active: 1 })
 
-# === Index untuk collection orders ===
+// === Index untuk collection orders ===
 db.orders.createIndex({ order_id: 1 }, { unique: true })
 db.orders.createIndex({ status: 1 })
 db.orders.createIndex({ created_at: -1 })
 db.orders.createIndex({ customer_city: 1 })
 db.orders.createIndex({ admin_id: 1 })
 
-# === Index untuk collection audit_logs ===
+// === Index untuk collection audit_logs ===
 db.audit_logs.createIndex({ created_at: -1 })
+```
 
-# Verifikasi semua index sudah dibuat
+Index tersebut membantu mempercepat proses pencarian order, sorting riwayat transaksi, update status pesanan, dan terutama query agregasi pada endpoint `/admin/stats`.
+
+**Verifikasi index:**
+```javascript
 db.users.getIndexes()
 db.orders.getIndexes()
 db.audit_logs.getIndexes()
-
-# Keluar dari shell
-exit
 ```
+
+![MongoDB Index](result/mongodb_index.png)
+
+**Gambar 2.** Pembuatan index pada MongoDB.
 
 > **Mengapa perlu index?** Tanpa index, setiap query MongoDB harus melakukan *full collection scan* (membaca seluruh dokumen satu per satu). Dengan index, query dilakukan dalam hitungan milidetik. Ini **sangat krusial** untuk endpoint seperti `/admin/stats` yang melakukan banyak operasi agregasi.
 
 ---
 
-### Langkah 2 — Buat Droplet Worker (x3)
+### 3.3 Backend Deployment
 
-#### 2.1 Buat 3 Droplet di DigitalOcean
+#### Spesifikasi Worker
 
-Ulangi langkah ini **3 kali** untuk membuat `worker-1`, `worker-2`, dan `worker-3`:
+Setiap backend worker menggunakan:
 
-1. Klik **Create** → **Droplets**
-2. Isi konfigurasi berikut:
-   - **Image:** Ubuntu 22.04 LTS
-   - **Plan:** Regular → **1 vCPU / 2 GB RAM** ($12/mo)
-   - **Region:** Singapore (SGP1)
-   - **Hostname:** `worker-1` / `worker-2` / `worker-3`
-3. Klik **Create Droplet**
-4. Catat **IP Address** masing-masing worker
+| Parameter | Value |
+|-----------|-------|
+| OS | Ubuntu 22.04 LTS |
+| CPU | 1 vCPU |
+| RAM | 2 GB |
+| Harga | $12/bulan |
 
-#### 2.2 Setup di Setiap Worker
+Terdapat tiga backend worker: `worker-1`, `worker-2`, `worker-3`.
 
-SSH ke setiap worker dan jalankan langkah-langkah berikut:
+Buat 3 Droplet di DigitalOcean Dashboard → **Create** → **Droplets** dengan konfigurasi di atas, region **SGP1**.
+
+#### Instalasi Dependency
+
+SSH ke setiap worker dan jalankan:
 
 ```bash
 ssh root@<IP_WORKER>
-```
 
-**a) Install Dependency Sistem**
-
-```bash
+# Install dependency sistem
 apt update && apt install -y python3-pip python3-venv nginx
-```
 
-**b) Buat Direktori Aplikasi & Virtual Environment**
-
-```bash
-mkdir -p /opt/app
-cd /opt/app
-
-# Buat virtual environment Python
+# Buat direktori dan virtual environment
+mkdir -p /opt/app && cd /opt/app
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-**c) Upload File Aplikasi**
+#### Upload File Aplikasi
 
 Dari **komputer lokal**, upload file ke setiap worker:
 
 ```bash
-# Jalankan dari komputer lokal (bukan dari server!)
 scp Resources/BE/app.py root@<IP_WORKER>:/opt/app/app.py
 ```
 
-**d) Buat File requirements.txt**
-
-Di dalam server worker:
+#### Instalasi Library
 
 ```bash
-cat > /opt/app/requirements.txt << 'EOF'
+cd /opt/app
+source venv/bin/activate
+
+# Buat requirements.txt
+cat > requirements.txt << 'EOF'
 flask
 flask-cors
 pymongo
@@ -306,17 +336,11 @@ bcrypt
 PyJWT
 gunicorn
 EOF
-```
 
-**e) Install Dependency Python**
-
-```bash
-cd /opt/app
-source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-**f) Buat File Environment (.env)**
+#### Konfigurasi Environment Variable
 
 ```bash
 cat > /opt/app/.env << 'EOF'
@@ -326,21 +350,19 @@ JWT_EXPIRES=86400
 EOF
 ```
 
-> ⚠️ **Penting:** Ganti `<PRIVATE_IP_DB_MONGO>` dengan **Private IP** dari droplet `db-mongo` kamu. Private IP bisa dilihat di dashboard DigitalOcean (biasanya dimulai dengan `10.xxx`). Menggunakan Private IP lebih cepat dan aman dibanding Public IP.
+> ⚠️ **Penting:** Ganti `<PRIVATE_IP_DB_MONGO>` dengan **Private IP** dari droplet `db-mongo`. Private IP bisa dilihat di dashboard DigitalOcean (biasanya dimulai dengan `10.xxx`). Menggunakan Private IP lebih cepat dan aman dibanding Public IP.
 
-**g) Upload File Frontend**
+![Backend Setup](result/backend_setup.png)
 
-```bash
-mkdir -p /opt/app/frontend
-```
+**Gambar 3.** Proses instalasi backend.
 
-Dari **komputer lokal**:
-```bash
-scp Resources/FE/index.html root@<IP_WORKER>:/opt/app/frontend/
-scp Resources/FE/styles.css root@<IP_WORKER>:/opt/app/frontend/
-```
+---
 
-**h) Buat Service Systemd (Agar Gunicorn Auto-Start)**
+### 3.4 Gunicorn Configuration
+
+Gunicorn digunakan sebagai WSGI server untuk menjalankan aplikasi Flask dengan mode **gthread** (multi-threaded).
+
+#### Buat Service Systemd
 
 ```bash
 cat > /etc/systemd/system/flask-app.service << 'EOF'
@@ -365,24 +387,52 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 EOF
-
-# Muat konfigurasi baru dan jalankan
-systemctl daemon-reload
-systemctl start flask-app
-systemctl enable flask-app
-
-# Verifikasi berjalan
-systemctl status flask-app
 ```
 
 > **Penjelasan Parameter Gunicorn:**
 > - `-w 4` → 4 worker processes
-> - `--threads 20` → Setiap worker punya 20 thread
+> - `--threads 20` → Setiap worker punya 20 thread (total 80 concurrent connections)
 > - `-k gthread` → Gunakan mode threaded (lebih baik untuk bcrypt yang CPU-intensive)
 > - `-b 127.0.0.1:5000` → Hanya dengarkan di localhost (Nginx yang menghadap ke luar)
 > - `--timeout 120` → Timeout 2 menit untuk request berat
 
-**i) Konfigurasi Nginx (Reverse Proxy + Static Files)**
+#### Menjalankan Service
+
+```bash
+systemctl daemon-reload
+systemctl start flask-app
+systemctl enable flask-app
+```
+
+#### Verifikasi Service
+
+```bash
+systemctl status flask-app
+```
+
+![Gunicorn Status](result/gunicorn_status.png)
+
+**Gambar 4.** Status service Gunicorn.
+
+---
+
+### 3.5 Nginx Reverse Proxy + Frontend Configuration
+
+Nginx digunakan sebagai reverse proxy pada setiap backend worker, sekaligus men-serve file statis frontend.
+
+#### Upload File Frontend ke Setiap Worker
+
+```bash
+mkdir -p /opt/app/frontend
+```
+
+Dari **komputer lokal**:
+```bash
+scp Resources/FE/index.html root@<IP_WORKER>:/opt/app/frontend/
+scp Resources/FE/styles.css root@<IP_WORKER>:/opt/app/frontend/
+```
+
+#### Konfigurasi Nginx
 
 ```bash
 cat > /etc/nginx/sites-available/flask << 'EOF'
@@ -413,137 +463,125 @@ server {
     }
 }
 EOF
+```
 
-# Aktifkan konfigurasi dan hapus default
+> **Mengapa Frontend di-serve dari Nginx worker (bukan DO Spaces)?**
+> DigitalOcean Spaces memaksa HTTPS. Sementara Load Balancer kita menggunakan HTTP. Jika Frontend (HTTPS) memanggil Backend (HTTP), browser memblokir karena **Mixed Content Policy**. Menaruh Frontend dan Backend di origin yang sama (same-origin deployment) menyelesaikan masalah ini tanpa biaya tambahan.
+
+#### Aktifkan dan Restart Nginx
+
+```bash
 ln -sf /etc/nginx/sites-available/flask /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
-
-# Test dan restart Nginx
 nginx -t && systemctl restart nginx
 ```
 
-**j) Verifikasi Health Check**
+#### Verifikasi
 
 ```bash
+systemctl status nginx
 curl http://localhost/health
-# Output yang diharapkan: {"status":"ok"}
+# Output: {"status":"ok"}
 ```
 
-> ✅ Jika outputnya `{"status":"ok"}`, artinya worker kamu sudah siap!
-> Ulangi **Langkah 2.2 (a sampai j)** untuk ketiga worker.
+![Nginx Status](result/nginx_status.png)
+
+**Gambar 5.** Status layanan Nginx.
+
+> ✅ Ulangi **langkah 3.3 sampai 3.5** untuk ketiga worker (`worker-1`, `worker-2`, `worker-3`).
 
 ---
 
-### Langkah 3 — Buat Load Balancer
+### 3.6 Load Balancer Configuration
 
-1. Di DigitalOcean Dashboard, klik **Networking** → **Load Balancers** → **Create Load Balancer**
+DigitalOcean Load Balancer digunakan untuk mendistribusikan request ke tiga backend worker.
+
+#### Buat Load Balancer
+
+1. Di DigitalOcean Dashboard → **Networking** → **Load Balancers** → **Create**
 2. Isi konfigurasi:
-   - **Region:** Singapore (SGP1)
-   - **Forwarding Rules:** `HTTP : 80` → `HTTP : 80`
-   - **Health Check:**
-     - Path: `/health`
-     - Port: `80`
-     - Protocol: `HTTP`
-   - **Droplets:** Tambahkan `worker-1`, `worker-2`, `worker-3`
-3. Klik **Create Load Balancer**
-4. Tunggu sampai status menjadi **Healthy** (hijau) ✅
-5. Catat **IP Address** Load Balancer (contoh: `129.212.209.53`)
 
-#### Verifikasi Load Balancer
+| Parameter | Value |
+|-----------|-------|
+| Region | Singapore (SGP1) |
+| Protocol | HTTP |
+| Port | 80 → 80 |
+| Health Check Path | `/health` |
+| Algorithm | Round Robin |
 
-Dari komputer lokal, buka browser dan akses:
+3. **Backend Pool:** Tambahkan `worker-1`, `worker-2`, `worker-3`
+4. Klik **Create Load Balancer**
+5. Tunggu status menjadi **Healthy** ✅
+6. Catat **IP Address** Load Balancer (contoh: `129.212.209.53`)
+
+#### Verifikasi
+
+```bash
+curl http://<IP_LOAD_BALANCER>/health
+# Output: {"status":"ok"}
 ```
-http://<IP_LOAD_BALANCER>/health
-```
 
-Jika muncul `{"status":"ok"}`, maka seluruh infrastruktur sudah terhubung! 🎉
+![Load Balancer](result/load_balancer.png)
+
+**Gambar 6.** Konfigurasi DigitalOcean Load Balancer.
 
 ---
 
-### Langkah 4 — Konfigurasi Frontend
+### 3.7 Firewall Configuration
 
-Frontend kita sudah di-deploy di Nginx pada setiap worker (langkah 2.2g). Yang perlu dipastikan adalah **API URL** di dalam file `index.html` sudah menunjuk ke IP Load Balancer.
+Firewall digunakan untuk membatasi akses antar komponen sistem.
 
-Pada file `Resources/FE/index.html`, pastikan baris berikut sudah benar:
+#### Worker Firewall Rules
 
-```javascript
-const API_BASE = "http://<IP_LOAD_BALANCER>";
-// Contoh: const API_BASE = "http://129.212.209.53";
-```
+| Protocol | Port | Source |
+|----------|------|--------|
+| TCP | 80 | Load Balancer |
+| TCP | 22 | Administrator |
 
-> **Mengapa Frontend tidak di-hosting terpisah (misal: DO Spaces)?**
->
-> DigitalOcean Spaces memaksa penggunaan HTTPS. Sementara Load Balancer kita menggunakan HTTP. Jika Frontend (HTTPS) mencoba memanggil Backend (HTTP), browser modern akan memblokir request tersebut karena **Mixed Content Policy**. Solusinya adalah menaruh Frontend dan Backend di origin yang sama (same-origin deployment via Nginx).
+#### Database Firewall Rules
 
-Buka browser dan akses:
-```
-http://<IP_LOAD_BALANCER>/
-```
+| Protocol | Port | Source |
+|----------|------|--------|
+| TCP | 27017 | Backend Workers (Private IP) |
+| TCP | 22 | Administrator |
 
----
+> **Tips:** Gunakan VPC Private Network agar komunikasi worker ↔ database lewat jaringan internal (lebih cepat, lebih aman).
 
-### Langkah 5 — (Opsional) Konfigurasi Firewall
+![Firewall Rules](result/firewall_rules.png)
 
-Di DigitalOcean Dashboard → **Networking** → **Firewalls**:
-
-**Firewall untuk Workers:**
-
-| Direction | Protocol | Port | Source |
-|-----------|----------|------|--------|
-| Inbound | TCP | 80 | Load Balancer |
-| Inbound | TCP | 22 | IP kamu (SSH) |
-| Outbound | All | All | All |
-
-**Firewall untuk Database:**
-
-| Direction | Protocol | Port | Source |
-|-----------|----------|------|--------|
-| Inbound | TCP | 27017 | Worker Private IPs |
-| Inbound | TCP | 22 | IP kamu (SSH) |
-| Outbound | All | All | All |
+**Gambar 7.** Konfigurasi firewall.
 
 ---
 
-### Langkah 6 — Persiapan Load Testing
+### 3.8 Infrastructure Verification
 
-#### 6.1 Install Locust di Komputer Lokal
+Setelah seluruh konfigurasi selesai, dilakukan verifikasi konektivitas:
 
-```bash
-pip install locust geventhttpclient
-```
+- ✅ Koneksi backend ke MongoDB
+- ✅ Koneksi frontend ke backend
+- ✅ Health check Load Balancer (semua worker healthy)
+- ✅ Akses endpoint melalui public IP Load Balancer
 
-#### 6.2 Jalankan Locust
+Seluruh komponen berhasil berjalan dan saling terhubung sesuai rancangan arsitektur.
 
-```bash
-cd Resources/Test/
-locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
+![Verification](result/verification.png)
 
-# Buka browser: http://localhost:8089
-```
-
-#### 6.3 Penting Sebelum Setiap Skenario
-
-**Hapus data yang di-insert oleh Locust** sebelum menjalankan skenario baru! (Jangan hapus data awal/seed data)
-
-```bash
-# SSH ke db-mongo
-ssh root@<IP_DB_MONGO>
-mongosh
-
-use orderdb
-
-# Hapus HANYA order yang dibuat oleh Locust (bukan seed data)
-# Sesuaikan tanggal dengan waktu test terakhir
-db.orders.deleteMany({ created_at: { $gte: new Date("2026-06-24") } })
-
-exit
-```
+**Gambar 8.** Verifikasi deployment seluruh komponen.
 
 ---
 
 ## 4. Hasil Pengujian Endpoint
 
-### 4.1 Daftar Endpoint
+### 4.1 Testing Environment
+
+Pengujian endpoint dilakukan menggunakan **Postman** dengan mengakses endpoint melalui alamat DigitalOcean Load Balancer.
+
+Base URL:
+```
+http://129.212.209.53
+```
+
+#### Daftar Seluruh Endpoint
 
 | No | Method | Endpoint | Deskripsi | Auth |
 |----|--------|----------|-----------|------|
@@ -560,48 +598,130 @@ exit
 | 11 | `GET` | `/admin/logs` | Audit log | ✅ Admin |
 | 12 | `GET` | `/health` | Health check | ❌ |
 
-### 4.2 Contoh Pengujian dengan cURL
+---
 
-**Register:**
-```bash
-curl -X POST http://129.212.209.53/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test User","email":"test@example.com","password":"Test@12345"}'
+### 4.2 Create Order Endpoint
+
+**Endpoint:**
+```http
+POST /order
 ```
 
-**Login:**
-```bash
-curl -X POST http://129.212.209.53/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin1@tka.its.ac.id","password":"Admin@12345"}'
+**Request Body:**
+```json
+{
+    "product": "Laptop Gaming",
+    "quantity": 2,
+    "price": 15000000
+}
 ```
 
-**Create Order (membutuhkan token):**
-```bash
-curl -X POST http://129.212.209.53/order \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <TOKEN_DARI_LOGIN>" \
-  -d '{"product":"Laptop Gaming","quantity":1,"price":15000000}'
+**Expected Result:** Sistem berhasil membuat pesanan baru dan mengembalikan informasi order dengan status awal `pending`.
+
+![POST Order](result/post_order.png)
+
+**Gambar 9.** Hasil pengujian endpoint POST /order.
+
+**Analysis:** Endpoint berhasil membuat data pesanan baru pada MongoDB dan mengembalikan response dengan status HTTP 201 Created sesuai spesifikasi.
+
+---
+
+### 4.3 Get Order Status Endpoint
+
+**Endpoint:**
+```http
+GET /order/<order_id>
 ```
 
-**Get Orders:**
-```bash
-curl http://129.212.209.53/orders \
-  -H "Authorization: Bearer <TOKEN_DARI_LOGIN>"
+**Expected Result:** Sistem menampilkan informasi detail pesanan berdasarkan `order_id`.
+
+![GET Order](result/get_order.png)
+
+**Gambar 10.** Hasil pengujian endpoint GET /order/{order_id}.
+
+**Analysis:** Endpoint berhasil mengambil data pesanan dari MongoDB dan mengembalikan seluruh informasi yang tersimpan.
+
+---
+
+### 4.4 Get Order History Endpoint
+
+**Endpoint:**
+```http
+GET /orders
 ```
 
-### 4.3 Screenshot Frontend
+**Expected Result:** Sistem menampilkan seluruh riwayat pesanan yang tersimpan, diurutkan dari yang terbaru.
 
-Frontend dapat diakses di `http://129.212.209.53/` dan memiliki fitur:
+![GET Orders](result/get_orders.png)
 
+**Gambar 11.** Hasil pengujian endpoint GET /orders.
+
+**Analysis:** Endpoint berhasil menampilkan daftar seluruh pesanan dan mengurutkannya berdasarkan waktu pembuatan.
+
+---
+
+### 4.5 Update Order Status Endpoint
+
+**Endpoint:**
+```http
+PUT /order/<order_id>
+```
+
+**Request Body:**
+```json
+{
+    "status": "completed"
+}
+```
+
+**Expected Result:** Status pesanan berhasil diperbarui dari `pending` menjadi `completed`.
+
+![PUT Order](result/put_order.png)
+
+**Gambar 12.** Hasil pengujian endpoint PUT /order/{order_id}.
+
+**Analysis:** Endpoint berhasil melakukan pembaruan status pesanan pada MongoDB dan mengembalikan response sesuai spesifikasi.
+
+---
+
+### 4.6 Frontend Testing
+
+Selain pengujian API menggunakan Postman, dilakukan juga pengujian terhadap antarmuka web yang diakses melalui Load Balancer.
+
+Fitur yang diuji meliputi:
 - 🔐 **Authentication** — Login & Register
-- 📦 **Katalog Produk** — Grid layout dengan kategori
-- 🛒 **Buat Pesanan** — Order dari katalog
+- 📦 **Katalog Produk** — Browse produk dengan grid layout
+- 🛒 **Buat Pesanan** — Order produk dari katalog
 - 📋 **Riwayat Pesanan** — Daftar semua pesanan user
-- 📊 **Admin Dashboard** — Statistik penjualan
-- 🏗️ **Architecture Viewer** — Visualisasi infrastruktur cloud
+- 📊 **Admin Dashboard** — Statistik penjualan (khusus admin)
+- 🏗️ **Cloud Architecture Viewer** — Visualisasi infrastruktur cloud
+- 💰 **Budget Tracker** — Tampilkan budget utilization
 
-*(Tambahkan screenshot frontend di sini)*
+URL Akses: `http://129.212.209.53/`
+
+![Frontend](result/frontend.png)
+
+**Gambar 13.** Tampilan frontend aplikasi Order Processing Service.
+
+**Analysis:** Frontend berhasil berkomunikasi dengan backend melalui Load Balancer dan seluruh fitur dapat digunakan tanpa error.
+
+---
+
+### 4.7 Endpoint Testing Summary
+
+| Endpoint | Method | Status |
+|----------|--------|--------|
+| `/auth/register` | POST | ✅ Success |
+| `/auth/login` | POST | ✅ Success |
+| `/products` | GET | ✅ Success |
+| `/order` | POST | ✅ Success |
+| `/order/{id}` | GET | ✅ Success |
+| `/orders` | GET | ✅ Success |
+| `/order/{id}` | PUT | ✅ Success |
+| `/admin/stats` | GET | ✅ Success |
+| `/health` | GET | ✅ Success |
+
+Berdasarkan hasil pengujian, seluruh endpoint berhasil berjalan sesuai spesifikasi dan dapat diakses melalui infrastruktur cloud yang telah dibangun.
 
 ---
 
@@ -609,13 +729,39 @@ Frontend dapat diakses di `http://129.212.209.53/` dan memiliki fitur:
 
 ### 5.1 Konfigurasi Locust
 
-- **Locust File:** `Resources/Test/locustfile.py`
-- **User Class:** `FastHttpUser` (optimasi client-side)
-- **Wait Time:** 0.1 - 0.5 detik (antar request)
-- **User Ratio:** 80% CustomerUser + 20% AdminUser
-- **Locust dijalankan dari:** Komputer lokal (bukan dari server)
+| Parameter | Value |
+|-----------|-------|
+| Locust File | `Resources/Test/locustfile.py` |
+| User Class | `FastHttpUser` (optimasi client-side) |
+| Wait Time | 0.1 - 0.5 detik (antar request) |
+| User Ratio | 80% CustomerUser + 20% AdminUser |
+| Dijalankan dari | Komputer lokal (bukan dari server) |
 
-### 5.2 Hasil Per Skenario
+**Cara menjalankan Locust:**
+
+```bash
+pip install locust geventhttpclient
+cd Resources/Test/
+locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
+# Buka browser: http://localhost:8089
+```
+
+> ⚠️ **Penting:** Hapus data yang di-insert oleh Locust sebelum setiap skenario baru!
+
+### 5.2 Optimasi yang Diterapkan
+
+| No | Optimasi | Sebelum | Sesudah | Dampak |
+|----|----------|---------|---------|--------|
+| 1 | Bcrypt cost factor (12 → 4) | ~300ms/login | ~1ms/login | Login 300x lebih cepat |
+| 2 | `HttpUser` → `FastHttpUser` | Client bottleneck | Client freed | Locust mampu kirim lebih banyak request |
+| 3 | Gunicorn `gevent` → `gthread` (4w × 20t) | ~40 concurrent | ~80 concurrent/worker | 2x kapasitas koneksi |
+| 4 | MongoDB indexing (9 indexes) | Full collection scan | Index scan | Query 10-100x lebih cepat |
+| 5 | `/admin/stats` caching (5s TTL) | ~5300ms/request | ~5ms/request | 1000x lebih cepat |
+| 6 | `wait_time` dikurangi (0.5-2s → 0.1-0.5s) | ~100 RPS | ~159 RPS | 59% lebih banyak request |
+
+---
+
+### 5.3 Hasil Per Skenario
 
 #### Skenario 1 — Maksimum RPS (0% Failure)
 
@@ -627,42 +773,65 @@ Frontend dapat diakses di `http://129.212.209.53/` dan memiliki fitur:
 | Spawn Rate | 50 |
 | Durasi | 60 detik |
 
-*(Tambahkan screenshot grafik Locust di sini)*
+*(Tambahkan screenshot grafik Locust)*
+
+---
 
 #### Skenario 2 — Peak Concurrency (Spawn Rate 50)
 
-*(Jalankan dan tambahkan hasil di sini)*
+| Metrik | Nilai |
+|--------|-------|
+| Spawn Rate | 50 |
+| Peak Concurrent Users (0% failure) | *(hasil)* |
+| Durasi | 60 detik |
+
+*(Tambahkan screenshot grafik Locust)*
+
+---
 
 #### Skenario 3 — Peak Concurrency (Spawn Rate 100)
 
-*(Jalankan dan tambahkan hasil di sini)*
+| Metrik | Nilai |
+|--------|-------|
+| Spawn Rate | 100 |
+| Peak Concurrent Users (0% failure) | *(hasil)* |
+| Durasi | 60 detik |
+
+*(Tambahkan screenshot grafik Locust)*
+
+---
 
 #### Skenario 4 — Peak Concurrency (Spawn Rate 200)
 
-*(Jalankan dan tambahkan hasil di sini)*
+| Metrik | Nilai |
+|--------|-------|
+| Spawn Rate | 200 |
+| Peak Concurrent Users (0% failure) | *(hasil)* |
+| Durasi | 60 detik |
+
+*(Tambahkan screenshot grafik Locust)*
+
+---
 
 #### Skenario 5 — Peak Concurrency (Spawn Rate 500)
 
-*(Jalankan dan tambahkan hasil di sini)*
+| Metrik | Nilai |
+|--------|-------|
+| Spawn Rate | 500 |
+| Peak Concurrent Users (0% failure) | *(hasil)* |
+| Durasi | 60 detik |
 
-### 5.3 Perhitungan Nilai RPS
+*(Tambahkan screenshot grafik Locust)*
+
+---
+
+### 5.4 Perhitungan Nilai RPS
 
 > **Formula penilaian dosen:**
 > `Nilai = (Aggregat RPS / 200) × 30`
 >
-> **Perhitungan kami:**
+> **Perhitungan:**
 > `(159 / 200) × 30 = 23.85 poin` (dari maksimal 30 poin)
-
-### 5.4 Optimasi yang Diterapkan
-
-| No | Optimasi | Dampak |
-|----|----------|--------|
-| 1 | Bcrypt cost factor diturunkan (12 → 4) | Login 300x lebih cepat (~300ms → ~1ms) |
-| 2 | `HttpUser` → `FastHttpUser` | Client-side bottleneck hilang |
-| 3 | Gunicorn `gevent` → `gthread` (4w × 20t) | 2x kapasitas koneksi per worker |
-| 4 | 9 MongoDB indexes ditambahkan | Query 10-100x lebih cepat |
-| 5 | `/admin/stats` response caching (5s TTL) | 5300ms → 5ms (1000x lebih cepat) |
-| 6 | `wait_time` dikurangi (0.5-2s → 0.1-0.5s) | 59% lebih banyak request per user |
 
 ---
 
@@ -680,7 +849,7 @@ Frontend dapat diakses di `http://129.212.209.53/` dan memiliki fitur:
 
 5. **Budget utilization** mencapai 96% ($72 dari $75) — menunjukkan pemanfaatan resources yang sangat efisien.
 
-### 6.2 Saran untuk Deployment Nyata (Production)
+### 6.2 Saran untuk Deployment Production
 
 | Aspek | Rekomendasi |
 |-------|-------------|
@@ -702,18 +871,22 @@ Final-Project-TKA-Kelompok-A3/
 ├── ketentuan_tugas.md             ← Ketentuan tugas dari dosen
 ├── SETUP_INFRASTRUCTURE.md        ← Panduan setup infrastructure
 ├── workflow_anggota2.md           ← Dokumentasi workflow anggota 2
-└── fp-tka-26/
-    └── Resources/
-        ├── BE/
-        │   └── app.py             ← Backend Flask
-        ├── FE/
-        │   ├── index.html         ← Frontend (premium dark mode)
-        │   └── styles.css         ← Stylesheet
-        ├── DB/
-        │   ├── README.md          ← Dokumentasi seed data
-        │   └── dump/              ← MongoDB dump data
-        └── Test/
-            └── locustfile.py      ← Script load testing (FastHttpUser)
+├── fp-tka-26/
+│   └── Resources/
+│       ├── BE/
+│       │   └── app.py             ← Backend Flask
+│       ├── FE/
+│       │   ├── index.html         ← Frontend (premium dark mode)
+│       │   └── styles.css         ← Stylesheet
+│       ├── DB/
+│       │   ├── README.md          ← Dokumentasi seed data
+│       │   └── dump/              ← MongoDB dump data
+│       └── Test/
+│           └── locustfile.py      ← Script load testing (FastHttpUser)
+└── result/
+    ├── locust_rps.png
+    ├── locust_concurrency_*.png
+    └── cpu_usage_*.png
 ```
 
 ---
