@@ -9,12 +9,16 @@ Sebuah layanan backend **Order Processing Service** yang di-deploy pada infrastr
 > **Cloud Provider:** DigitalOcean (Budget: $75/bulan)
 > **URL Akses:** [`http://129.212.209.53`](http://129.212.209.53)
 
+# KELOMPOK 4 KELAS A
+
 | Nama | NRP |
-|------|-----|
-| Anggota 1 | NRP 1 |
-| Anggota 2 | NRP 2 |
-| Anggota 3 | NRP 3 |
-| Anggota 4 | NRP 4 |
+| :--- | :--- |
+| Evan Christian Nainggolan | 5027241026 |
+| Rizqi Akbar Sukirman P. | 5027241044 |
+| Dina Rahmadani | 5027241065 |
+| M. Hikari Reiziq | 5027241079 |
+| Ahmad Syawqi Reza | 5027241085 |
+| Yasykur Khalis Jati | 5027241112 |
 
 ---
 
