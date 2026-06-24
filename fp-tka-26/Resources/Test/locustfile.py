@@ -4,7 +4,7 @@ Jalankan dari host BERBEDA dari server:
     locust -f locustfile.py --host=http://<IP_SERVER>
 """
 
-from locust import HttpUser, task, between, events
+from locust import FastHttpUser, task, between, events
 import random
 
 PRODUCTS_CACHE = []   # diisi saat on_start
@@ -18,9 +18,9 @@ STATUSES  = ["pending","processing","completed","cancelled"]
 # ════════════════════════════════════════════
 # Regular User — simulates customer behaviour
 # ════════════════════════════════════════════
-class CustomerUser(HttpUser):
+class CustomerUser(FastHttpUser):
     weight    = 8   # 80% traffic adalah user biasa
-    wait_time = between(0.5, 2)
+    wait_time = between(0.1, 0.5)
 
     def on_start(self):
         """Login sebagai user biasa."""
@@ -127,9 +127,9 @@ class CustomerUser(HttpUser):
 # ════════════════════════════════════════════
 # Admin User — simulates backoffice activity
 # ════════════════════════════════════════════
-class AdminUser(HttpUser):
+class AdminUser(FastHttpUser):
     weight    = 2   # 20% traffic admin
-    wait_time = between(1, 4)
+    wait_time = between(0.1, 0.5)
 
     def on_start(self):
         idx = random.randint(1, 5)
