@@ -29,3 +29,38 @@ Sebagai *Cloud Engineer*, tantangan utama dalam proyek ini adalah mendeploy, men
 
 ### Diagram Arsitektur
 Arsitektur dirancang secara terdistribusi dengan memisahkan beban *Traffic Management*, *Application Logic*, dan *Database Storage* melalui jaringan privat (VPC).
+
+### Tabel Spesifikasi & Alokasi Biaya
+Dengan total anggaran **$59/bulan**, arsitektur ini menyisakan sisa *budget* sekitar ~$16 yang bisa dialokasikan kembali untuk *scaling* horizontal (menambah 1-2 worker lagi) jika diperlukan selama pengujian.
+
+| Komponen | Spesifikasi Droplet / Service | Harga/Bulan |
+| :--- | :--- | :--- |
+| Load Balancer | DigitalOcean LB | $12 |
+| Worker 1 (Backend) | Regular Droplet - 1 vCPU, 1 GB RAM | $6 |
+| Worker 2 (Backend) | Regular Droplet - 1 vCPU, 1 GB RAM | $6 |
+| Worker 3 (Backend) | Regular Droplet - 1 vCPU, 1 GB RAM | $6 |
+| Database (MongoDB) | Regular Droplet - 2 vCPU, 4 GB RAM | $24 |
+| Frontend (Spaces CDN)| Static hosting + CDN | $5 |
+| **Total Pengeluaran**| | **$59 / bulan** |
+
+### Analisis Performa & Efisiensi Biaya
+1. **Pemisahan Database Terdedikasi:** Menempatkan MongoDB pada Droplet berspesifikasi lebih tinggi (2 vCPU / 4 GB RAM) ditujukan agar sistem *caching database* (`wiredTiger`) berjalan optimal serta mencegah bottleneck I/O bersaing dengan *Application Web Server*.
+2. **Horizontal Scaling Backend Workers:** Alih-alih menyewa satu server besar, kami membagi aplikasi ke dalam 3 Droplet Worker kecil berbiaya $6/bulan. Jika salah satu server mengalami gangguan, beban otomatis dialihkan oleh Load Balancer ke worker yang lain (*High Availability*).
+3. **Optimasi Network Jaringan Internal (VPC):** Komunikasi antar Worker menuju Database dikonfigurasi melalui Private IP. Hal ini memangkas latency network, meningkatkan kecepatan transfer data, dan meningkatkan keamanan karena port database tidak dibuka ke publik.
+
+---
+
+## 3. Implementasi
+
+### A. Setup & Optimasi Database Server (MongoDB)
+Menggunakan droplet berspesifikasi 2 vCPU / 4 GB RAM dengan OS Ubuntu 22.04 LTS yang berlokasi di region terdekat (**Singapore - sgp1**).
+
+1. **Instalasi MongoDB 7.0:**
+   ```bash
+   curl -fsSL [https://www.mongodb.org/static/pgp/server-7.0.asc](https://www.mongodb.org/static/pgp/server-7.0.asc) | \
+     gpg --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
+
+   echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] [https://repo.mongodb.org/apt/ubuntu](https://repo.mongodb.org/apt/ubuntu) jammy/mongodb-org/7.0 multiverse" | \
+     tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+
+   apt update && apt install -y mongodb-org mongodb-database-tools
