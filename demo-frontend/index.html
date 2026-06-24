@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Order Processing Service - Final Project Teknologi Komputasi Awan Kelompok A3" />
+  <title>🛒 Order Processing Service — FP TKA Kelompok A3</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Animated background -->
+  <div class="bg-pattern"></div>
+  
+  <div class="container">
+    <!-- Header -->
+    <header id="main-header">
+      <div class="header-badge">☁️ Cloud Computing Final Project</div>
+      <h1>Order Processing Service</h1>
+      <p class="subtitle">Teknologi Komputasi Awan — Kelompok A3 | DigitalOcean Cloud Infrastructure</p>
+      <div class="infra-status" id="infra-status">
+        <div class="status-dot"></div>
+        <span>Checking infrastructure...</span>
+      </div>
+    </header>
+
+    <!-- Auth Section -->
+    <section class="card glass-card" id="auth-section">
+      <div class="card-header">
+        <h2>🔐 Authentication</h2>
+        <div class="auth-tabs">
+          <button class="tab-btn active" onclick="showTab('login')">Login</button>
+          <button class="tab-btn" onclick="showTab('register')">Register</button>
+        </div>
+      </div>
+
+      <!-- Login Form -->
+      <div id="login-tab" class="tab-content active">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="login-email">Email</label>
+            <input type="email" id="login-email" placeholder="admin1@tka.its.ac.id" value="admin1@tka.its.ac.id" />
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password</label>
+            <input type="password" id="login-password" placeholder="Password" value="Admin@12345" />
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="doLogin()">
+          <span class="btn-icon">→</span> Login
+        </button>
+      </div>
+
+      <!-- Register Form -->
+      <div id="register-tab" class="tab-content">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="reg-name">Nama</label>
+            <input type="text" id="reg-name" placeholder="Nama lengkap" />
+          </div>
+          <div class="form-group">
+            <label for="reg-email">Email</label>
+            <input type="email" id="reg-email" placeholder="email@example.com" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="reg-password">Password</label>
+            <input type="password" id="reg-password" placeholder="Min 8 karakter" />
+          </div>
+          <div class="form-group">
+            <label for="reg-city">Kota</label>
+            <input type="text" id="reg-city" placeholder="Surabaya" />
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="doRegister()">
+          <span class="btn-icon">✓</span> Register
+        </button>
+      </div>
+
+      <div id="auth-result" class="result-box hidden"></div>
+      <div id="user-info" class="user-info hidden">
+        <div class="user-avatar" id="user-avatar">A</div>
+        <div class="user-details">
+          <span class="user-name" id="user-name"></span>
+          <span class="user-role" id="user-role"></span>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="doLogout()">Logout</button>
+      </div>
+    </section>
+
+    <!-- Dashboard Stats (Admin) -->
+    <section class="card glass-card" id="stats-section" style="display:none;">
+      <div class="card-header">
+        <h2>📊 Dashboard Admin</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadStats()">↻ Refresh</button>
+      </div>
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-orders">-</div>
+          <div class="stat-label">Total Orders</div>
+        </div>
+        <div class="stat-card accent-green">
+          <div class="stat-value" id="stat-revenue">-</div>
+          <div class="stat-label">Revenue</div>
+        </div>
+        <div class="stat-card accent-blue">
+          <div class="stat-value" id="stat-users">-</div>
+          <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card accent-purple">
+          <div class="stat-value" id="stat-products">-</div>
+          <div class="stat-label">Products</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Products Catalog -->
+    <section class="card glass-card" id="products-section">
+      <div class="card-header">
+        <h2>🛍️ Katalog Produk</h2>
+        <button class="btn btn-outline btn-sm" onclick="loadProducts()">↻ Refresh</button>
+      </div>
+      <div class="products-grid" id="products-grid">
+        <div class="loading-shimmer">Memuat produk...</div>
+      </div>
+    </section>
+
+    <!-- Create Order -->
+    <section class="card glass-card" id="order-section" style="display:none;">
+      <div class="card-header">
+        <h2>🛒 Buat Pesanan</h2>
+      </div>
+      <div id="cart-items">
+        <p class="empty-state">Klik "Tambah ke Cart" pada produk untuk mulai memesan</p>
+      </div>
+      <div class="form-row" id="order-extras" style="display:none;">
+        <div class="form-group">
+          <label for="payment-method">Metode Pembayaran</label>
+          <select id="payment-method">
+            <option value="transfer_bank">Transfer Bank</option>
+            <option value="gopay">GoPay</option>
+            <option value="ovo">OVO</option>
+            <option value="dana">DANA</option>
+            <option value="qris">QRIS</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="shipping-cost">Ongkos Kirim (Rp)</label>
+          <select id="shipping-cost">
+            <option value="0">Gratis Ongkir</option>
+            <option value="9000">Rp 9.000</option>
+            <option value="15000" selected>Rp 15.000</option>
+            <option value="25000">Rp 25.000</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" id="address-group" style="display:none;">
+        <label for="order-address">Alamat Pengiriman</label>
+        <input type="text" id="order-address" placeholder="Jl. Raya ITS, Surabaya" />
+      </div>
+      <button class="btn btn-primary btn-lg" id="submit-order-btn" style="display:none;" onclick="submitOrder()">
+        <span class="btn-icon">📦</span> Submit Pesanan
+      </button>
+      <div id="order-result" class="result-box hidden"></div>
+    </section>
+
+    <!-- Order History -->
+    <section class="card glass-card" id="orders-history-section" style="display:none;">
+      <div class="card-header">
+        <h2>📋 Riwayat Pesanan</h2>
+        <div class="header-actions">
+          <select id="filter-status" onchange="loadOrders()">
+            <option value="">Semua Status</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadOrders()">↻</button>
+        </div>
+      </div>
+      <div id="orders-list">
+        <div class="loading-shimmer">Memuat orders...</div>
+      </div>
+    </section>
+
+    <!-- Check Single Order -->
+    <section class="card glass-card" id="check-order-section" style="display:none;">
+      <div class="card-header">
+        <h2>🔍 Cek Status Pesanan</h2>
+      </div>
+      <div class="form-row">
+        <div class="form-group flex-grow">
+          <label for="check-order-id">Order ID</label>
+          <input type="text" id="check-order-id" placeholder="Masukkan UUID order" />
+        </div>
+        <button class="btn btn-primary" onclick="checkOrder()" style="align-self:flex-end;">Cek</button>
+      </div>
+      <div id="check-order-result" class="result-box hidden"></div>
+    </section>
+
+    <!-- Update Order Status (Admin) -->
+    <section class="card glass-card" id="update-status-section" style="display:none;">
+      <div class="card-header">
+        <h2>⚡ Update Status Pesanan (Admin)</h2>
+      </div>
+      <div class="form-row">
+        <div class="form-group flex-grow">
+          <label for="update-order-id">Order ID</label>
+          <input type="text" id="update-order-id" placeholder="UUID order" />
+        </div>
+        <div class="form-group">
+          <label for="update-new-status">Status Baru</label>
+          <select id="update-new-status">
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="updateOrderStatus()" style="align-self:flex-end;">Update</button>
+      </div>
+      <div id="update-status-result" class="result-box hidden"></div>
+    </section>
+
+    <!-- Infrastructure Info -->
+    <section class="card glass-card">
+      <div class="card-header">
+        <h2>🏗️ Cloud Architecture</h2>
+      </div>
+      <div class="architecture-diagram">
+        <div class="arch-row">
+          <div class="arch-node arch-lb">
+            <div class="arch-icon">⚖️</div>
+            <div class="arch-label">Load Balancer</div>
+            <div class="arch-detail">129.212.209.53</div>
+            <div class="arch-status" id="lb-status">●</div>
+          </div>
+        </div>
+        <div class="arch-connector">│</div>
+        <div class="arch-row arch-workers">
+          <div class="arch-node arch-worker">
+            <div class="arch-icon">⚙️</div>
+            <div class="arch-label">Worker 1</div>
+            <div class="arch-detail">1vCPU/1GB</div>
+            <div class="arch-status" id="w1-status">●</div>
+          </div>
+          <div class="arch-node arch-worker">
+            <div class="arch-icon">⚙️</div>
+            <div class="arch-label">Worker 2</div>
+            <div class="arch-detail">1vCPU/1GB</div>
+            <div class="arch-status" id="w2-status">●</div>
+          </div>
+          <div class="arch-node arch-worker">
+            <div class="arch-icon">⚙️</div>
+            <div class="arch-label">Worker 3</div>
+            <div class="arch-detail">1vCPU/1GB</div>
+            <div class="arch-status" id="w3-status">●</div>
+          </div>
+        </div>
+        <div class="arch-connector">│</div>
+        <div class="arch-row">
+          <div class="arch-node arch-db">
+            <div class="arch-icon">🗄️</div>
+            <div class="arch-label">MongoDB</div>
+            <div class="arch-detail">2vCPU/4GB</div>
+            <div class="arch-status" id="db-status">●</div>
+          </div>
+        </div>
+      </div>
+      <div class="budget-bar">
+        <div class="budget-label">Budget: $54 / $75</div>
+        <div class="budget-track">
+          <div class="budget-fill" style="width: 72%;"></div>
+        </div>
+        <div class="budget-detail">LB $12 + 3×Worker $6 + DB $24 = <strong>$54/bulan</strong></div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+      <p>Final Project TKA 2026 — Kelompok A3 | Powered by DigitalOcean ☁️</p>
+    </footer>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════
+    // Configuration
+    // ═══════════════════════════════════════
+    const API_BASE = "http://129.212.209.53";
+    let authToken = null;
+    let currentUser = null;
+    let cart = [];
+    let productsCache = [];
+
+    // ═══════════════════════════════════════
+    // Helpers
+    // ═══════════════════════════════════════
+    function authHeaders() {
+      const h = { "Content-Type": "application/json" };
+      if (authToken) h["Authorization"] = `Bearer ${authToken}`;
+      return h;
+    }
+
+    function formatRupiah(num) {
+      return "Rp " + Number(num).toLocaleString("id-ID");
+    }
+
+    function showResult(elId, data, isError = false) {
+      const el = document.getElementById(elId);
+      el.classList.remove("hidden", "error", "success");
+      el.classList.add(isError ? "error" : "success");
+      if (typeof data === "string") {
+        el.textContent = data;
+      } else {
+        el.textContent = JSON.stringify(data, null, 2);
+      }
+      el.style.animation = "none";
+      el.offsetHeight;
+      el.style.animation = "slideUp 0.3s ease";
+    }
+
+    function statusBadge(status) {
+      const colors = {
+        pending: "#f59e0b",
+        processing: "#3b82f6",
+        completed: "#10b981",
+        cancelled: "#ef4444"
+      };
+      return `<span class="status-badge" style="--badge-color:${colors[status] || '#6b7280'}">${status}</span>`;
+    }
+
+    // ═══════════════════════════════════════
+    // Auth
+    // ═══════════════════════════════════════
+    function showTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.getElementById(tab + '-tab').classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    async function doLogin() {
+      const email = document.getElementById("login-email").value.trim();
+      const password = document.getElementById("login-password").value;
+      if (!email || !password) return showResult("auth-result", "Email dan password wajib diisi", true);
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok) return showResult("auth-result", data, true);
+
+        authToken = data.token;
+        currentUser = data.user;
+        onLoginSuccess();
+        showResult("auth-result", `✅ Login berhasil sebagai ${data.user.name} (${data.user.role})`);
+      } catch (e) {
+        showResult("auth-result", { error: e.message }, true);
+      }
+    }
+
+    async function doRegister() {
+      const name = document.getElementById("reg-name").value.trim();
+      const email = document.getElementById("reg-email").value.trim();
+      const password = document.getElementById("reg-password").value;
+      const city = document.getElementById("reg-city").value.trim();
+      if (!name || !email || !password) return showResult("auth-result", "Semua field wajib diisi", true);
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/register`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password, city })
+        });
+        const data = await res.json();
+        if (!res.ok) return showResult("auth-result", data, true);
+
+        authToken = data.token;
+        currentUser = data.user;
+        onLoginSuccess();
+        showResult("auth-result", `✅ Registrasi berhasil! Selamat datang, ${data.user.name}`);
+      } catch (e) {
+        showResult("auth-result", { error: e.message }, true);
+      }
+    }
+
+    function onLoginSuccess() {
+      document.getElementById("user-info").classList.remove("hidden");
+      document.getElementById("user-name").textContent = currentUser.name;
+      document.getElementById("user-role").textContent = currentUser.role.toUpperCase();
+      document.getElementById("user-role").className = `user-role role-${currentUser.role}`;
+      document.getElementById("user-avatar").textContent = currentUser.name.charAt(0).toUpperCase();
+
+      // Show sections based on role
+      document.getElementById("order-section").style.display = "";
+      document.getElementById("orders-history-section").style.display = "";
+      document.getElementById("check-order-section").style.display = "";
+
+      if (currentUser.role === "admin") {
+        document.getElementById("stats-section").style.display = "";
+        document.getElementById("update-status-section").style.display = "";
+        loadStats();
+      }
+      loadOrders();
+    }
+
+    function doLogout() {
+      authToken = null;
+      currentUser = null;
+      cart = [];
+      document.getElementById("user-info").classList.add("hidden");
+      document.getElementById("stats-section").style.display = "none";
+      document.getElementById("order-section").style.display = "none";
+      document.getElementById("orders-history-section").style.display = "none";
+      document.getElementById("check-order-section").style.display = "none";
+      document.getElementById("update-status-section").style.display = "none";
+      document.getElementById("auth-result").classList.add("hidden");
+      renderCart();
+    }
+
+    // ═══════════════════════════════════════
+    // Products
+    // ═══════════════════════════════════════
+    async function loadProducts() {
+      const grid = document.getElementById("products-grid");
+      try {
+        const res = await fetch(`${API_BASE}/products?limit=50`);
+        const data = await res.json();
+        productsCache = data.data || [];
+
+        if (productsCache.length === 0) {
+          grid.innerHTML = '<p class="empty-state">Belum ada produk tersedia</p>';
+          return;
+        }
+
+        grid.innerHTML = productsCache.map(p => `
+          <div class="product-card">
+            <div class="product-category">${p.category || 'Umum'}</div>
+            <h3 class="product-name">${p.name}</h3>
+            <div class="product-price">${formatRupiah(p.price)}</div>
+            <div class="product-meta">
+              <span>⭐ ${(p.rating || 0).toFixed(1)}</span>
+              <span>📦 Stok: ${p.stock ?? '-'}</span>
+            </div>
+            ${authToken && currentUser?.role === 'user' ?
+              `<button class="btn btn-sm btn-accent" onclick="addToCart('${p._id}','${p.name.replace(/'/g,"\\'")}',${p.price})">+ Tambah ke Cart</button>` :
+              ''}
+          </div>
+        `).join('');
+      } catch (e) {
+        grid.innerHTML = `<p class="error-state">Gagal memuat: ${e.message}</p>`;
+      }
+    }
+
+    // ═══════════════════════════════════════
+    // Cart & Orders
+    // ═══════════════════════════════════════
+    function addToCart(productId, name, price) {
+      const existing = cart.find(c => c.product_id === productId);
+      if (existing) {
+        existing.qty++;
+      } else {
+        cart.push({ product_id: productId, name, price, qty: 1 });
+      }
+      renderCart();
+      // Flash effect on button
+      document.getElementById("order-section").style.animation = "none";
+      document.getElementById("order-section").offsetHeight;
+      document.getElementById("order-section").style.animation = "pulse 0.5s ease";
+    }
+
+    function removeFromCart(index) {
+      cart.splice(index, 1);
+      renderCart();
+    }
+
+    function renderCart() {
+      const container = document.getElementById("cart-items");
+      const extras = document.getElementById("order-extras");
+      const addrGroup = document.getElementById("address-group");
+      const submitBtn = document.getElementById("submit-order-btn");
+
+      if (cart.length === 0) {
+        container.innerHTML = '<p class="empty-state">Klik "Tambah ke Cart" pada produk untuk mulai memesan</p>';
+        extras.style.display = "none";
+        addrGroup.style.display = "none";
+        submitBtn.style.display = "none";
+        return;
+      }
+
+      let total = cart.reduce((s, c) => s + c.price * c.qty, 0);
+      container.innerHTML = `
+        <div class="cart-list">
+          ${cart.map((c, i) => `
+            <div class="cart-item">
+              <div class="cart-item-info">
+                <span class="cart-item-name">${c.name}</span>
+                <span class="cart-item-price">${formatRupiah(c.price)} × ${c.qty}</span>
+              </div>
+              <div class="cart-item-actions">
+                <span class="cart-item-subtotal">${formatRupiah(c.price * c.qty)}</span>
+                <button class="btn-remove" onclick="removeFromCart(${i})">✕</button>
+              </div>
+            </div>
+          `).join('')}
+          <div class="cart-total">
+            <span>Subtotal</span>
+            <span>${formatRupiah(total)}</span>
+          </div>
+        </div>
+      `;
+      extras.style.display = "";
+      addrGroup.style.display = "";
+      submitBtn.style.display = "";
+    }
+
+    async function submitOrder() {
+      if (cart.length === 0) return;
+
+      const payload = {
+        items: cart.map(c => ({ product_id: c.product_id, qty: c.qty })),
+        payment_method: document.getElementById("payment-method").value,
+        shipping_cost: parseInt(document.getElementById("shipping-cost").value),
+        address: document.getElementById("order-address").value || "Surabaya"
+      };
+
+      try {
+        const res = await fetch(`${API_BASE}/orders`, {
+          method: "POST", headers: authHeaders(), body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) return showResult("order-result", data, true);
+
+        showResult("order-result",
+          `✅ Pesanan berhasil!\n\nOrder ID: ${data.order_id}\nTotal: ${formatRupiah(data.total)}\nStatus: ${data.status}`);
+        cart = [];
+        renderCart();
+        loadProducts(); // refresh stock
+        loadOrders();
+      } catch (e) {
+        showResult("order-result", { error: e.message }, true);
+      }
+    }
+
+    // ═══════════════════════════════════════
+    // Order History
+    // ═══════════════════════════════════════
+    async function loadOrders() {
+      if (!authToken) return;
+      const list = document.getElementById("orders-list");
+      const status = document.getElementById("filter-status").value;
+      let url = `${API_BASE}/orders?limit=20`;
+      if (status) url += `&status=${status}`;
+
+      try {
+        const res = await fetch(url, { headers: authHeaders() });
+        const data = await res.json();
+
+        if (!data.data || data.data.length === 0) {
+          list.innerHTML = '<p class="empty-state">Belum ada pesanan</p>';
+          return;
+        }
+
+        list.innerHTML = `
+          <div class="orders-table">
+            <div class="orders-header">
+              <span>Order ID</span>
+              <span>Customer</span>
+              <span>Total</span>
+              <span>Status</span>
+              <span>Tanggal</span>
+            </div>
+            ${data.data.map(o => `
+              <div class="order-row" onclick="document.getElementById('check-order-id').value='${o.order_id}'; checkOrder();">
+                <span class="order-id-cell" title="${o.order_id}">${o.order_id.substring(0, 8)}...</span>
+                <span>${o.customer_name || '-'}</span>
+                <span>${formatRupiah(o.total)}</span>
+                <span>${statusBadge(o.status)}</span>
+                <span>${new Date(o.created_at).toLocaleDateString('id-ID')}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div class="orders-meta">Total: ${data.total} pesanan | Halaman ${data.page}/${data.total_pages}</div>
+        `;
+      } catch (e) {
+        list.innerHTML = `<p class="error-state">${e.message}</p>`;
+      }
+    }
+
+    async function checkOrder() {
+      const oid = document.getElementById("check-order-id").value.trim();
+      if (!oid) return showResult("check-order-result", "Order ID wajib diisi", true);
+
+      try {
+        const res = await fetch(`${API_BASE}/orders/${oid}`, { headers: authHeaders() });
+        const data = await res.json();
+        showResult("check-order-result", data, !res.ok);
+        // Auto-fill update section
+        if (res.ok) {
+          document.getElementById("update-order-id").value = oid;
+        }
+      } catch (e) {
+        showResult("check-order-result", { error: e.message }, true);
+      }
+    }
+
+    async function updateOrderStatus() {
+      const oid = document.getElementById("update-order-id").value.trim();
+      const status = document.getElementById("update-new-status").value;
+      if (!oid) return showResult("update-status-result", "Order ID wajib diisi", true);
+
+      try {
+        const res = await fetch(`${API_BASE}/orders/${oid}/status`, {
+          method: "PUT", headers: authHeaders(), body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        showResult("update-status-result", data, !res.ok);
+        if (res.ok) loadOrders();
+      } catch (e) {
+        showResult("update-status-result", { error: e.message }, true);
+      }
+    }
+
+    // ═══════════════════════════════════════
+    // Admin Stats
+    // ═══════════════════════════════════════
+    async function loadStats() {
+      try {
+        const res = await fetch(`${API_BASE}/admin/stats`, { headers: authHeaders() });
+        const data = await res.json();
+        if (!res.ok) return;
+        document.getElementById("stat-orders").textContent = data.summary.total_orders.toLocaleString();
+        document.getElementById("stat-revenue").textContent = formatRupiah(data.summary.total_revenue);
+        document.getElementById("stat-users").textContent = data.summary.total_users;
+        document.getElementById("stat-products").textContent = data.summary.total_products;
+      } catch (e) { /* ignore */ }
+    }
+
+    // ═══════════════════════════════════════
+    // Infrastructure Check
+    // ═══════════════════════════════════════
+    async function checkInfrastructure() {
+      const statusEl = document.getElementById("infra-status");
+      try {
+        const start = Date.now();
+        const res = await fetch(`${API_BASE}/health`);
+        const data = await res.json();
+        const latency = Date.now() - start;
+        if (data.status === "ok") {
+          statusEl.innerHTML = `<div class="status-dot online"></div><span>Infrastructure Online — Response: ${latency}ms</span>`;
+          document.getElementById("lb-status").className = "arch-status online";
+          document.getElementById("w1-status").className = "arch-status online";
+          document.getElementById("w2-status").className = "arch-status online";
+          document.getElementById("w3-status").className = "arch-status online";
+          document.getElementById("db-status").className = "arch-status online";
+        }
+      } catch (e) {
+        statusEl.innerHTML = `<div class="status-dot offline"></div><span>Infrastructure Offline</span>`;
+      }
+    }
+
+    // ═══════════════════════════════════════
+    // Init
+    // ═══════════════════════════════════════
+    window.addEventListener("DOMContentLoaded", () => {
+      checkInfrastructure();
+      loadProducts();
+    });
+  </script>
+</body>
+</html>
