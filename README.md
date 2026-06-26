@@ -771,13 +771,14 @@ locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
 
 | Metrik | Nilai |
 |--------|-------|
-| **RPS Tertinggi** | **~159 RPS** |
+| **RPS Tertinggi** | **~380.64 RPS** |
 | Failure Rate | **0%** |
 | Number of Users | 500 |
 | Spawn Rate | 50 |
 | Durasi | 60 detik |
 
-*(Tambahkan screenshot grafik Locust)*
+![Locust RPS](result/locust_rps.png)
+![CPU Usage](result/cpu_usage_1.png)
 
 ---
 
@@ -786,10 +787,10 @@ locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
 | Metrik | Nilai |
 |--------|-------|
 | Spawn Rate | 50 |
-| Peak Concurrent Users (0% failure) | *(hasil)* |
+| Peak Concurrent Users (0% failure) | **1500 Users** |
 | Durasi | 60 detik |
 
-*(Tambahkan screenshot grafik Locust)*
+![Locust Skenario 2](result/locust_concurrency_50.png)
 
 ---
 
@@ -798,10 +799,10 @@ locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
 | Metrik | Nilai |
 |--------|-------|
 | Spawn Rate | 100 |
-| Peak Concurrent Users (0% failure) | *(hasil)* |
+| Peak Concurrent Users (0% failure) | **3000 Users** |
 | Durasi | 60 detik |
 
-*(Tambahkan screenshot grafik Locust)*
+![Locust Skenario 3](result/locust_concurrency_100.png)
 
 ---
 
@@ -810,10 +811,10 @@ locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
 | Metrik | Nilai |
 |--------|-------|
 | Spawn Rate | 200 |
-| Peak Concurrent Users (0% failure) | *(hasil)* |
+| Peak Concurrent Users (0% failure) | **3000 Users** |
 | Durasi | 60 detik |
 
-*(Tambahkan screenshot grafik Locust)*
+![Locust Skenario 4](result/locust_concurrency_200.png)
 
 ---
 
@@ -822,10 +823,10 @@ locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
 | Metrik | Nilai |
 |--------|-------|
 | Spawn Rate | 500 |
-| Peak Concurrent Users (0% failure) | *(hasil)* |
+| Peak Concurrent Users (0% failure) | **3000 Users** |
 | Durasi | 60 detik |
 
-*(Tambahkan screenshot grafik Locust)*
+![Locust Skenario 5](result/locust_concurrency_500.png)
 
 ---
 
@@ -835,7 +836,7 @@ locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
 > `Nilai = (Aggregat RPS / 200) × 30`
 >
 > **Perhitungan:**
-> `(159 / 200) × 30 = 23.85 poin` (dari maksimal 30 poin)
+> `(380.64 / 200) × 30 = 57.09 poin` (Full 30 Poin, karena melebihi target dosen!)
 
 ---
 
@@ -843,7 +844,7 @@ locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
 
 ### 6.1 Kesimpulan
 
-1. **Arsitektur 3 Worker + 1 Database** merupakan konfigurasi paling optimal dalam constraint budget $75/bulan. Konfigurasi ini mampu mencapai **~159 RPS dengan 0% failure rate**.
+1. **Arsitektur 3 Worker + 1 Database** merupakan konfigurasi paling optimal dalam constraint budget $75/bulan. Konfigurasi ini mampu mencapai **~380 RPS dengan 0% failure rate**.
 
 2. **Bottleneck utama** ada pada kapasitas CPU worker (1 vCPU per worker). Setiap worker mampu memproses ~53 RPS. Dengan 3 worker, total throughput mencapai ~159 RPS.
 
