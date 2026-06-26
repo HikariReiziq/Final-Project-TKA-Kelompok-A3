@@ -128,6 +128,10 @@ Sebagai Cloud Engineer, kami diminta untuk **mendeploy, mengonfigurasi, dan meng
 | 5 | Database Server | `db-mongo` | 2vCPU, 4 GB RAM, 80 GB SSD | SGP1 | $24 |
 | | | | | **Total** | **$72/bulan** |
 
+![DigitalOcean Resources](result/resources.png)
+
+*Gambar: Tampilan Dashboard DigitalOcean yang menunjukkan resources aktif.*
+
 > **Budget Utilization:** $72 / $75 = **96%** — Sangat efisien, hanya menyisakan $3 sebagai buffer.
 
 ### 2.3 Justifikasi Pemilihan Arsitektur
