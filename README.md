@@ -703,7 +703,11 @@ Fitur yang diuji meliputi:
 
 URL Akses: `http://129.212.209.53/`
 
-![Frontend](result/frontend.png)
+![Frontend 1](result/frontend1.png)
+<br>
+![Frontend 2](result/frontend2.png)
+<br>
+![Frontend 3](result/frontend3.png)
 
 **Gambar 13.** Tampilan frontend aplikasi Order Processing Service.
 
