@@ -830,15 +830,6 @@ locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
 
 ---
 
-### 5.4 Perhitungan Nilai RPS
-
-> **Formula penilaian dosen:**
-> `Nilai = (Aggregat RPS / 200) × 30`
->
-> **Perhitungan:**
-> `(380.64 / 200) × 30 = 57.09 poin` (Full 30 Poin, karena melebihi target dosen!)
-
----
 
 ## 6. Kesimpulan dan Saran
 
