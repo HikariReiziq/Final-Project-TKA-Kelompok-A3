@@ -712,6 +712,8 @@ URL Akses: `http://129.212.209.53/`
 ![Frontend 2](result/frontend2.png)
 <br>
 ![Frontend 3](result/frontend3.png)
+<br>
+![Frontend 4](result/frontend4.png)
 
 **Gambar 13.** Tampilan frontend aplikasi Order Processing Service.
 
@@ -872,9 +874,12 @@ locust -f locustfile.py --host=http://<IP_LOAD_BALANCER>
 ```
 Final-Project-TKA-Kelompok-A3/
 ├── README.md                      ← Laporan ini
-├── ketentuan_tugas.md             ← Ketentuan tugas dari dosen
-├── SETUP_INFRASTRUCTURE.md        ← Panduan setup infrastructure
-├── workflow_anggota2.md           ← Dokumentasi workflow anggota 2
+├── docs/
+│   ├── Handover Document - FP TKA A3.pdf   ← Laporan handover
+│   ├── How to increase performance.md      ← Laporan handover
+│   ├── Ketentuan_tugas.md                  ← Laporan handover
+│   ├── SETUP_INFRASTRUCTURE.md             ← Laporan handover
+│   └── workflow_anggota2.md                ← Laporan handover
 ├── fp-tka-26/
 │   └── Resources/
 │       ├── BE/
